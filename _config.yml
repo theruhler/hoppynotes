@@ -1,0 +1,5 @@
+# GitHub Pages (Jekyll) build settings: keep non-site files off the published site.
+exclude:
+  - worker
+  - README.md
+  - _config.yml

@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#FFF3F4" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="HoppyNotes" />
+    <title>HoppyNotes</title>
+    <link rel="icon" type="image/png" sizes="32x32" href="assets/brand/favicon-32.png" />
+    <link rel="apple-touch-icon" href="assets/brand/apple-touch-icon.png" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="top-bar">
+        <h1>HoppyNotes</h1>
+        <div class="top-actions">
+          <button id="settingsBtn" class="btn secondary small">Settings</button>
+          <button id="installBtn" class="btn secondary small" hidden>Install</button>
+        </div>
+      </header>
+
+      <section id="paywallScreen" class="card creator hidden">
+        <h2>Send someone a little love</h2>
+        <p class="hint">Create a personalized note with 30 sweet messages and a shareable link they can open any day, on any device.</p>
+        <button id="unlockBtn" class="btn">Unlock for $1.99</button>
+        <p id="paywallStatus" class="hint error hidden"></p>
+        <p class="hint">One-time purchase. After checkout you'll come right back here, unlocked.</p>
+      </section>
+
+      <section id="creatorScreen" class="card creator hidden">
+        <h2>Create a note for someone you love</h2>
+        <p class="hint">Enter two names, then share the link you get. Whoever opens it sees their own personalized notes.</p>
+
+        <label class="field" for="creatorRecipientInput">
+          <span>Their name</span>
+          <input id="creatorRecipientInput" type="text" maxlength="40" placeholder="e.g. Jennifer" />
+        </label>
+
+        <label class="field" for="creatorSenderInput">
+          <span>Your name</span>
+          <input id="creatorSenderInput" type="text" maxlength="40" placeholder="e.g. Bob" />
+        </label>
+
+        <button id="generateLinkBtn" class="btn">Generate Their Link</button>
+
+        <div id="generatedLinkArea" class="generated-link hidden">
+          <p class="hint">Share this link with them:</p>
+          <label class="sr-only" for="generatedLinkOutput">Generated share link</label>
+          <input id="generatedLinkOutput" type="text" readonly placeholder="Your link will appear here" title="Generated share link" />
+          <div class="controls">
+            <button id="copyLinkBtn" class="btn secondary">Copy Link</button>
+            <button id="shareGeneratedBtn" class="btn secondary">Share</button>
+          </div>
+          <button id="previewLinkBtn" class="btn">Preview Their Note</button>
+        </div>
+      </section>
+
+      <section id="noteScreen" class="card hidden" aria-live="polite">
+        <div class="bunny-wrap">
+          <img id="bunnyImage" src="bunny1.png" alt="Bunny" />
+          <div id="bunnyTint" class="bunny-tint"></div>
+        </div>
+        <p id="messageText">Tap for a new note.</p>
+
+        <nav class="controls" aria-label="Controls">
+          <button id="prevBtn" class="btn">Previous</button>
+          <button id="nextBtn" class="btn">Next</button>
+          <button id="shuffleBunnyBtn" class="btn secondary">New Bunny</button>
+        </nav>
+
+        <p class="hint" id="noteHint">Tip: Tap the bunny for a fresh note. Swipe left/right to browse.</p>
+        <button id="makeMyOwnBtn" class="btn secondary small">Make My Own Note</button>
+      </section>
+    </main>
+
+    <section id="settingsModal" class="modal hidden" aria-hidden="true" role="dialog" aria-labelledby="settingsTitle">
+      <div class="modal-card">
+        <h2 id="settingsTitle">Settings</h2>
+
+        <label class="field" for="fontSizeInput">
+          <span>Font Size</span>
+          <input id="fontSizeInput" type="range" min="14" max="30" step="1" />
+        </label>
+
+        <label class="field checkbox" for="signatureToggle">
+          <input id="signatureToggle" type="checkbox" />
+          <span id="signatureToggleLabel">Show signature</span>
+        </label>
+
+        <label class="field" for="themeSelect">
+          <span>Theme Color</span>
+          <select id="themeSelect">
+            <option value="sunset">Sunset</option>
+            <option value="mint">Mint</option>
+            <option value="sky">Sky</option>
+            <option value="rose">Rose</option>
+          </select>
+        </label>
+
+        <label class="field" for="bunnyColorInput">
+          <span>Bunny Color</span>
+          <input id="bunnyColorInput" type="color" value="#d9a5ff" />
+        </label>
+
+        <label class="field checkbox" for="bunnyColorToggle">
+          <input id="bunnyColorToggle" type="checkbox" />
+          <span>Tint the bunny with this color</span>
+        </label>
+
+        <div class="modal-actions">
+          <button id="saveSettingsBtn" class="btn">Save</button>
+          <button id="closeSettingsBtn" class="btn secondary">Close</button>
+        </div>
+      </div>
+    </section>
+
+    <script src="app.js"></script>
+  </body>
+</html>

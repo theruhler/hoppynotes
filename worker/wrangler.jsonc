@@ -1,0 +1,16 @@
+{
+  "name": "hoppynotes-verify",
+  "main": "worker.js",
+  "compatibility_date": "2026-08-21",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": {
+    "enabled": true,
+    "logs": { "head_sampling_rate": 1 }
+  },
+  "vars": {
+    // The site's origin (scheme + host only, no path).
+    "ALLOWED_ORIGIN": "https://theruhler.github.io"
+  }
+  // The Stripe secret key is NOT set here. After deploying, run:
+  //   wrangler secret put STRIPE_SECRET_KEY
+}
