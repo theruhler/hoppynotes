@@ -11,7 +11,7 @@
 //
 // Deploy with `wrangler deploy`, then: `wrangler secret put STRIPE_SECRET_KEY`.
 
-import { MESSAGES } from "./messages.js";
+import { MESSAGES, OCCASIONS } from "./messages.js";
 
 let cachedTokenKey = null;
 
@@ -99,7 +99,7 @@ export default {
       if (!sessionId || !sessionId.startsWith("cs_")) {
         return jsonResponse({ error: "invalid_share_token" }, 403, corsHeaders);
       }
-      return jsonResponse({ messages: MESSAGES }, 200, corsHeaders);
+      return jsonResponse({ messages: MESSAGES, occasions: OCCASIONS }, 200, corsHeaders);
     }
 
     // Buyer path: verify the checkout session with Stripe.
@@ -132,7 +132,12 @@ export default {
     }
 
     return jsonResponse(
-      { unlocked: true, shareToken: await mintShareToken(env, sessionId), messages: MESSAGES },
+      {
+        unlocked: true,
+        shareToken: await mintShareToken(env, sessionId),
+        messages: MESSAGES,
+        occasions: OCCASIONS
+      },
       200,
       corsHeaders
     );

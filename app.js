@@ -24,6 +24,248 @@ const THEME_MAP = {
   rose: { bg1: "#fff0f5", bg2: "#ffe3ea", accent: "#d85f86", ink: "#4f2a35" }
 };
 
+// --- Occasion calendar ---------------------------------------------------
+// Lunar-calendar holidays can't be derived arithmetically, so they use
+// verified tables. Past the last entry the app simply skips those two.
+const CHINESE_NEW_YEAR = {
+  2026: { date: "02-17", animal: "Horse" },
+  2027: { date: "02-06", animal: "Goat" },
+  2028: { date: "01-26", animal: "Monkey" },
+  2029: { date: "02-13", animal: "Rooster" },
+  2030: { date: "02-03", animal: "Dog" },
+  2031: { date: "01-23", animal: "Pig" },
+  2032: { date: "02-11", animal: "Rat" },
+  2033: { date: "01-31", animal: "Ox" },
+  2034: { date: "02-19", animal: "Tiger" },
+  2035: { date: "02-08", animal: "Rabbit" }
+};
+
+const PASSOVER_FIRST_DAY = {
+  2026: "04-01",
+  2027: "04-21",
+  2028: "04-10",
+  2029: "03-30",
+  2030: "04-17",
+  2031: "04-07",
+  2032: "03-26",
+  2033: "04-13",
+  2034: "04-03",
+  2035: "04-23"
+};
+
+const MONTH_NAMES = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December"
+];
+
+function pad2(value) {
+  return String(value).padStart(2, "0");
+}
+
+function dateAt(year, month, day) {
+  return new Date(year, month - 1, day);
+}
+
+function startOfDay(date) {
+  return dateAt(date.getFullYear(), date.getMonth() + 1, date.getDate());
+}
+
+function monthDayOf(date) {
+  return `${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
+}
+
+function addDays(date, days) {
+  const copy = new Date(date.getTime());
+  copy.setDate(copy.getDate() + days);
+  return copy;
+}
+
+function isSameDay(a, b) {
+  return a.getTime() === startOfDay(b).getTime();
+}
+
+// Anonymous Gregorian computus.
+function easterFor(year) {
+  const a = year % 19;
+  const b = Math.floor(year / 100);
+  const c = year % 100;
+  const d = Math.floor(b / 4);
+  const e = b % 4;
+  const f = Math.floor((b + 8) / 25);
+  const g = Math.floor((b - f + 1) / 3);
+  const h = (19 * a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4);
+  const k = c % 4;
+  const l = (32 + 2 * e + 2 * i - h - k) % 7;
+  const m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const month = Math.floor((h + l - 7 * m + 114) / 31);
+  const day = ((h + l - 7 * m + 114) % 31) + 1;
+  return dateAt(year, month, day);
+}
+
+// nth (1-based) weekday of a month; weekday 0 = Sunday.
+function nthWeekday(year, month, weekday, nth) {
+  const first = dateAt(year, month, 1);
+  const offset = (weekday - first.getDay() + 7) % 7;
+  return dateAt(year, month, 1 + offset + (nth - 1) * 7);
+}
+
+function lastWeekday(year, month, weekday) {
+  const lastDay = new Date(year, month, 0);
+  const offset = (lastDay.getDay() - weekday + 7) % 7;
+  return dateAt(year, month, lastDay.getDate() - offset);
+}
+
+// Accepts "MM-DD" (no year) or "YYYY-MM-DD".
+function parseOccasionDate(value) {
+  if (typeof value !== "string") {
+    return null;
+  }
+  let match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (match) {
+    return { year: Number(match[1]), month: Number(match[2]), day: Number(match[3]) };
+  }
+  match = /^(\d{2})-(\d{2})$/.exec(value);
+  if (match) {
+    return { year: null, month: Number(match[1]), day: Number(match[2]) };
+  }
+  return null;
+}
+
+function formatOccasionDate(parsed) {
+  if (!parsed || !parsed.month || !parsed.day) {
+    return "";
+  }
+  const monthDay = `${pad2(parsed.month)}-${pad2(parsed.day)}`;
+  return parsed.year ? `${parsed.year}-${monthDay}` : monthDay;
+}
+
+function ordinal(value) {
+  const lastTwo = value % 100;
+  if (lastTwo >= 11 && lastTwo <= 13) {
+    return `${value}th`;
+  }
+  switch (value % 10) {
+    case 1:
+      return `${value}st`;
+    case 2:
+      return `${value}nd`;
+    case 3:
+      return `${value}rd`;
+    default:
+      return `${value}th`;
+  }
+}
+
+function personalOccasion(id, value, monthDay, year) {
+  const parsed = parseOccasionDate(value);
+  if (!parsed || `${pad2(parsed.month)}-${pad2(parsed.day)}` !== monthDay) {
+    return null;
+  }
+  const years = parsed.year && year > parsed.year ? year - parsed.year : null;
+  return { id, years };
+}
+
+// Personal dates outrank holidays; the first match wins.
+function detectOccasion(now) {
+  const today = startOfDay(now);
+  const year = today.getFullYear();
+  const monthDay = monthDayOf(today);
+
+  const birthday = personalOccasion("birthday", personalization.birthday, monthDay, year);
+  if (birthday) {
+    return birthday;
+  }
+  const anniversary = personalOccasion("anniversary", personalization.anniversary, monthDay, year);
+  if (anniversary) {
+    return anniversary;
+  }
+
+  if (settings.faithHolidays) {
+    const easter = easterFor(year);
+    if (isSameDay(easter, today)) {
+      return { id: "easter" };
+    }
+    if (isSameDay(addDays(easter, -2), today)) {
+      return { id: "goodFriday" };
+    }
+    if (monthDay === "12-25") {
+      return { id: "christmas" };
+    }
+    if (monthDay === "12-24") {
+      return { id: "christmasEve" };
+    }
+    if (PASSOVER_FIRST_DAY[year] === monthDay) {
+      return { id: "passover" };
+    }
+  }
+
+  if (settings.funHolidays) {
+    if (monthDay === "01-01") {
+      return { id: "newYear" };
+    }
+    if (monthDay === "12-31") {
+      return { id: "newYearEve" };
+    }
+    const lunar = CHINESE_NEW_YEAR[year];
+    if (lunar && lunar.date === monthDay) {
+      return {
+        id: lunar.animal === "Rabbit" ? "chineseNewYearRabbit" : "chineseNewYear",
+        animal: lunar.animal
+      };
+    }
+    if (monthDay === "02-14") {
+      return { id: "valentines" };
+    }
+    if (monthDay === "03-17") {
+      return { id: "stPatricks" };
+    }
+    if (isSameDay(nthWeekday(year, 5, 0, 2), today)) {
+      return { id: "mothersDay" };
+    }
+    if (isSameDay(lastWeekday(year, 5, 1), today)) {
+      return { id: "memorialDay" };
+    }
+    if (isSameDay(nthWeekday(year, 6, 0, 3), today)) {
+      return { id: "fathersDay" };
+    }
+    if (monthDay === "07-04") {
+      return { id: "julyFourth" };
+    }
+    if (isSameDay(nthWeekday(year, 9, 1, 1), today)) {
+      return { id: "laborDay" };
+    }
+    if (monthDay === "10-31") {
+      return { id: "halloween" };
+    }
+    if (isSameDay(nthWeekday(year, 11, 4, 4), today)) {
+      return { id: "thanksgiving" };
+    }
+  }
+
+  // Lent is a season, not a day, so it only applies when nothing more
+  // specific landed today — otherwise it would swallow every holiday inside
+  // it, including St. Patrick's Day, which falls in Lent every year.
+  if (settings.faithHolidays) {
+    const easter = easterFor(year);
+    if (today >= addDays(easter, -46) && today < easter) {
+      return { id: "lent" };
+    }
+  }
+
+  return null;
+}
+
 const PAYWALL = {
   // Stripe Payment Link URL from the Stripe Dashboard (see README).
   // Its after-payment redirect must be: https://theruhler.github.io/hoppynotes/?session_id={CHECKOUT_SESSION_ID}
@@ -37,6 +279,7 @@ const SETTINGS_KEY = "hoppynotes-settings-v1";
 const PERSONALIZATION_KEY = "hoppynotes-personalization-v1";
 const UNLOCK_STORAGE_KEY = "hoppynotes-unlocked-v1";
 const MESSAGES_CACHE_KEY = "hoppynotes-messages-v1";
+const OCCASIONS_CACHE_KEY = "hoppynotes-occasions-v1";
 const SHARE_TOKEN_KEY = "hoppynotes-share-token-v1";
 
 const paywallScreen = document.getElementById("paywallScreen");
@@ -55,6 +298,7 @@ const previewLinkBtn = document.getElementById("previewLinkBtn");
 const makeMyOwnBtn = document.getElementById("makeMyOwnBtn");
 
 const messageText = document.getElementById("messageText");
+const occasionBanner = document.getElementById("occasionBanner");
 const noteHint = document.getElementById("noteHint");
 const bunnyImage = document.getElementById("bunnyImage");
 const bunnyTint = document.getElementById("bunnyTint");
@@ -70,16 +314,29 @@ const signatureToggleLabel = document.getElementById("signatureToggleLabel");
 const themeSelect = document.getElementById("themeSelect");
 const bunnyColorInput = document.getElementById("bunnyColorInput");
 const bunnyColorToggle = document.getElementById("bunnyColorToggle");
+const birthdayMonth = document.getElementById("birthdayMonth");
+const birthdayDay = document.getElementById("birthdayDay");
+const birthdayYear = document.getElementById("birthdayYear");
+const anniversaryMonth = document.getElementById("anniversaryMonth");
+const anniversaryDay = document.getElementById("anniversaryDay");
+const anniversaryYear = document.getElementById("anniversaryYear");
+const faithHolidayToggle = document.getElementById("faithHolidayToggle");
+const funHolidayToggle = document.getElementById("funHolidayToggle");
 const saveSettingsBtn = document.getElementById("saveSettingsBtn");
 const closeSettingsBtn = document.getElementById("closeSettingsBtn");
 
-let messages = TEASER_MESSAGES;
+let library = TEASER_MESSAGES;
+let messages = library;
+let occasionContent = null;
+let activeOccasion = null;
 let index = Math.floor(Math.random() * messages.length);
 let deferredPrompt = null;
 
 const personalization = {
   recipient: "",
-  sender: ""
+  sender: "",
+  birthday: "",
+  anniversary: ""
 };
 
 const settings = {
@@ -87,7 +344,9 @@ const settings = {
   showSignature: true,
   theme: "rose",
   bunnyColor: "#d9a5ff",
-  bunnyColorEnabled: false
+  bunnyColorEnabled: false,
+  faithHolidays: true,
+  funHolidays: true
 };
 
 function loadSettings() {
@@ -108,8 +367,22 @@ function loadSettings() {
     if (typeof parsed.bunnyColorEnabled === "boolean") {
       settings.bunnyColorEnabled = parsed.bunnyColorEnabled;
     }
+    if (typeof parsed.faithHolidays === "boolean") {
+      settings.faithHolidays = parsed.faithHolidays;
+    }
+    if (typeof parsed.funHolidays === "boolean") {
+      settings.funHolidays = parsed.funHolidays;
+    }
   } catch {
     // Keep defaults when storage is unavailable.
+  }
+}
+
+function savePersonalization() {
+  try {
+    localStorage.setItem(PERSONALIZATION_KEY, JSON.stringify(personalization));
+  } catch {
+    // Storage unavailable — the dates still apply to this page load.
   }
 }
 
@@ -117,11 +390,14 @@ function saveSettings() {
   localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
 }
 
-function setMessages(list) {
-  if (Array.isArray(list) && list.length) {
-    messages = list;
-    index = Math.floor(Math.random() * messages.length);
-  }
+// Today's occasion decides the rotation: themed notes come first, then the
+// rest of the library. Called on load, on settings save, and on unlock.
+function refreshOccasion() {
+  activeOccasion = detectOccasion(new Date());
+  const set = activeOccasion && occasionContent ? occasionContent[activeOccasion.id] : null;
+  const themed = set && Array.isArray(set.notes) ? set.notes : [];
+  messages = themed.length ? themed.concat(library) : library;
+  index = themed.length ? 0 : Math.floor(Math.random() * messages.length);
 }
 
 function cacheMessages(list) {
@@ -132,17 +408,48 @@ function cacheMessages(list) {
   }
 }
 
+function cacheOccasions(content) {
+  try {
+    localStorage.setItem(OCCASIONS_CACHE_KEY, JSON.stringify(content));
+  } catch {
+    // Storage unavailable — greetings still work for this page load.
+  }
+}
+
 function hydrateMessagesFromCache() {
+  let found = false;
   try {
     const parsed = JSON.parse(localStorage.getItem(MESSAGES_CACHE_KEY) || "null");
     if (Array.isArray(parsed) && parsed.length) {
-      setMessages(parsed);
-      return true;
+      library = parsed;
+      found = true;
     }
   } catch {
     // Fall through to teasers.
   }
-  return false;
+  try {
+    const parsed = JSON.parse(localStorage.getItem(OCCASIONS_CACHE_KEY) || "null");
+    if (parsed && typeof parsed === "object") {
+      occasionContent = parsed;
+    }
+  } catch {
+    // Greetings stay hidden until the next successful fetch.
+  }
+  refreshOccasion();
+  return found;
+}
+
+// Stores whatever gated content a Worker response carried.
+function absorbContent(data) {
+  if (Array.isArray(data.messages) && data.messages.length) {
+    cacheMessages(data.messages);
+    library = data.messages;
+  }
+  if (data.occasions && typeof data.occasions === "object") {
+    cacheOccasions(data.occasions);
+    occasionContent = data.occasions;
+  }
+  refreshOccasion();
 }
 
 // Recipients load the library with the opaque share token from their link.
@@ -154,8 +461,7 @@ async function fetchMessagesWithShareToken(token) {
     const resp = await fetch(`${PAYWALL.verifyEndpoint}?share=${encodeURIComponent(token)}`);
     const data = await resp.json();
     if (Array.isArray(data.messages) && data.messages.length) {
-      cacheMessages(data.messages);
-      setMessages(data.messages);
+      absorbContent(data);
       return true;
     }
   } catch {
@@ -180,8 +486,7 @@ async function refreshMessagesWithSession(sessionId) {
           // Ignore.
         }
       }
-      cacheMessages(data.messages);
-      setMessages(data.messages);
+      absorbContent(data);
       return true;
     }
   } catch {
@@ -200,6 +505,8 @@ function readUrlPersonalization() {
   return {
     recipient: (to || "").slice(0, 40),
     sender: (from || "").slice(0, 40),
+    birthday: formatOccasionDate(parseOccasionDate(params.get("bd") || "")),
+    anniversary: formatOccasionDate(parseOccasionDate(params.get("an") || "")),
     shareToken: params.get("st") || ""
   };
 }
@@ -217,6 +524,12 @@ function buildShareUrl(recipient, sender) {
   }
   if (shareToken) {
     url.searchParams.set("st", shareToken);
+  }
+  if (personalization.birthday) {
+    url.searchParams.set("bd", personalization.birthday);
+  }
+  if (personalization.anniversary) {
+    url.searchParams.set("an", personalization.anniversary);
   }
   return url.toString();
 }
@@ -236,6 +549,40 @@ function applyBunnyTint() {
   bunnyTint.classList.toggle("active", settings.bunnyColorEnabled);
 }
 
+function addOption(select, value, label) {
+  const option = document.createElement("option");
+  option.value = value;
+  option.textContent = label;
+  select.appendChild(option);
+}
+
+function populateDateSelects(monthSelect, daySelect) {
+  addOption(monthSelect, "", "Month");
+  MONTH_NAMES.forEach((name, i) => addOption(monthSelect, String(i + 1), name));
+  addOption(daySelect, "", "Day");
+  for (let day = 1; day <= 31; day++) {
+    addOption(daySelect, String(day), String(day));
+  }
+}
+
+function writeDateFields(value, monthSelect, daySelect, yearInput) {
+  const parsed = parseOccasionDate(value);
+  monthSelect.value = parsed ? String(parsed.month) : "";
+  daySelect.value = parsed ? String(parsed.day) : "";
+  yearInput.value = parsed && parsed.year ? String(parsed.year) : "";
+}
+
+function readDateFields(monthSelect, daySelect, yearInput) {
+  const month = Number(monthSelect.value);
+  const day = Number(daySelect.value);
+  if (!month || !day) {
+    return "";
+  }
+  const year = Number(yearInput.value);
+  const validYear = Number.isInteger(year) && year >= 1900 && year <= 2200 ? year : null;
+  return formatOccasionDate({ month, day, year: validYear });
+}
+
 function applySettingsToUI() {
   document.documentElement.style.setProperty("--message-font-size", `${settings.fontSize}px`);
   applyTheme(settings.theme);
@@ -244,6 +591,10 @@ function applySettingsToUI() {
   themeSelect.value = settings.theme;
   bunnyColorInput.value = settings.bunnyColor;
   bunnyColorToggle.checked = settings.bunnyColorEnabled;
+  faithHolidayToggle.checked = settings.faithHolidays;
+  funHolidayToggle.checked = settings.funHolidays;
+  writeDateFields(personalization.birthday, birthdayMonth, birthdayDay, birthdayYear);
+  writeDateFields(personalization.anniversary, anniversaryMonth, anniversaryDay, anniversaryYear);
   signatureToggleLabel.textContent = `Show signature (- ${personalization.sender || "your name"})`;
   applyBunnyTint();
 }
@@ -261,10 +612,45 @@ function personalizeTemplate(template, name) {
     .replace(/^./, (c) => c.toUpperCase());
 }
 
+// Banner tokens differ from note tokens: no trailing period, and the name is
+// dropped along with its comma when there isn't one.
+function fillBannerTokens(template) {
+  let text = template;
+  if (activeOccasion && activeOccasion.animal) {
+    text = text.replace(/\{animal\}/g, activeOccasion.animal);
+  }
+  if (activeOccasion && activeOccasion.years) {
+    text = text
+      .replace(/\{ordinal\}/g, ordinal(activeOccasion.years))
+      .replace(/\{years\}/g, String(activeOccasion.years));
+  }
+  return personalization.recipient
+    ? text.replace(/\{name\}/g, personalization.recipient)
+    : text.replace(/,?\s*\{name\}/g, "");
+}
+
+function renderBanner() {
+  const set = activeOccasion && occasionContent ? occasionContent[activeOccasion.id] : null;
+  const lines =
+    set && activeOccasion.years && Array.isArray(set.bannerWithYears) && set.bannerWithYears.length
+      ? set.bannerWithYears
+      : set && Array.isArray(set.banner)
+        ? set.banner
+        : [];
+  if (!lines.length) {
+    occasionBanner.textContent = "";
+    occasionBanner.classList.add("hidden");
+    return;
+  }
+  occasionBanner.textContent = fillBannerTokens(lines[index % lines.length]);
+  occasionBanner.classList.remove("hidden");
+}
+
 function renderMessage() {
   const withName = personalizeTemplate(messages[index], personalization.recipient);
   const signature = settings.showSignature && personalization.sender ? ` - ${personalization.sender}` : "";
   messageText.textContent = `${withName}${signature}`;
+  renderBanner();
 }
 
 function nextMessage() {
@@ -290,7 +676,7 @@ function showNoteScreen() {
   paywallScreen.classList.add("hidden");
   noteScreen.classList.remove("hidden");
   noteHint.textContent =
-    messages === TEASER_MESSAGES
+    library === TEASER_MESSAGES
       ? "Only a few sample notes are loaded. Open your note link while online to see them all."
       : "Tip: Tap the bunny for a fresh note. Swipe left/right to browse.";
   applySettingsToUI();
@@ -364,10 +750,7 @@ async function consumeCheckoutSession() {
       } catch {
         // Storage unavailable — the unlock still applies to this page load.
       }
-      if (Array.isArray(data.messages) && data.messages.length) {
-        cacheMessages(data.messages);
-        setMessages(data.messages);
-      }
+      absorbContent(data);
       setPaywallStatus("", false);
       return true;
     }
@@ -434,6 +817,7 @@ shareGeneratedBtn.addEventListener("click", async () => {
 previewLinkBtn.addEventListener("click", () => {
   personalization.recipient = generatedLinkArea.dataset.recipient || "";
   personalization.sender = generatedLinkArea.dataset.sender || "";
+  refreshOccasion();
   showNoteScreen();
 });
 
@@ -463,7 +847,13 @@ saveSettingsBtn.addEventListener("click", () => {
   settings.theme = themeSelect.value;
   settings.bunnyColor = bunnyColorInput.value;
   settings.bunnyColorEnabled = bunnyColorToggle.checked;
+  settings.faithHolidays = faithHolidayToggle.checked;
+  settings.funHolidays = funHolidayToggle.checked;
+  personalization.birthday = readDateFields(birthdayMonth, birthdayDay, birthdayYear);
+  personalization.anniversary = readDateFields(anniversaryMonth, anniversaryDay, anniversaryYear);
   saveSettings();
+  savePersonalization();
+  refreshOccasion();
   applySettingsToUI();
   renderMessage();
   closeSettings();
@@ -520,22 +910,44 @@ if ("serviceWorker" in navigator) {
   });
 }
 
+function loadStoredPersonalization() {
+  try {
+    return JSON.parse(localStorage.getItem(PERSONALIZATION_KEY) || "{}");
+  } catch {
+    return {};
+  }
+}
+
 loadSettings();
+populateDateSelects(birthdayMonth, birthdayDay);
+populateDateSelects(anniversaryMonth, anniversaryDay);
 
 (async () => {
   const justUnlocked = await consumeCheckoutSession();
   const fromUrl = readUrlPersonalization();
+  const stored = loadStoredPersonalization();
+
+  // Dates the buyer set travel in the link; otherwise keep this device's own.
+  personalization.birthday = (fromUrl && fromUrl.birthday) || stored.birthday || "";
+  personalization.anniversary = (fromUrl && fromUrl.anniversary) || stored.anniversary || "";
+
   if (justUnlocked) {
+    savePersonalization();
     showCreatorScreen();
   } else if (fromUrl) {
     personalization.recipient = fromUrl.recipient;
     personalization.sender = fromUrl.sender;
-    localStorage.setItem(PERSONALIZATION_KEY, JSON.stringify(personalization));
+    savePersonalization();
     if (!hydrateMessagesFromCache()) {
       await fetchMessagesWithShareToken(fromUrl.shareToken);
     }
+    refreshOccasion();
     showNoteScreen();
   } else {
+    if (stored.recipient && stored.sender) {
+      personalization.recipient = stored.recipient;
+      personalization.sender = stored.sender;
+    }
     if (!hydrateMessagesFromCache() && isUnlocked()) {
       try {
         await refreshMessagesWithSession(localStorage.getItem(UNLOCK_STORAGE_KEY));
@@ -543,16 +955,10 @@ loadSettings();
         // Teasers remain until the buyer is back online.
       }
     }
-    try {
-      const stored = JSON.parse(localStorage.getItem(PERSONALIZATION_KEY) || "{}");
-      if (stored.recipient && stored.sender) {
-        personalization.recipient = stored.recipient;
-        personalization.sender = stored.sender;
-        showNoteScreen();
-      } else {
-        openCreator();
-      }
-    } catch {
+    refreshOccasion();
+    if (personalization.recipient && personalization.sender) {
+      showNoteScreen();
+    } else {
       openCreator();
     }
   }

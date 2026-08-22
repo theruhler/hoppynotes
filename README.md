@@ -7,6 +7,7 @@ This is a **separate project** from the private "Bunny Notes" app built for pers
 - No PIN lock (a public product should not force a PIN on the recipient).
 - No hardcoded names or Disney-referencing quotes — all 30 messages are original.
 - Adds a "Create a note" screen: the buyer enters a recipient name and their own name, gets a shareable link, and can preview it before sending.
+- Adds occasion greetings: birthdays, anniversaries, and holidays (see below).
 - Brand name: **HoppyNotes**.
 - The bunny artwork is original work created by the project owner — full commercial rights, nothing to license.
 
@@ -14,6 +15,16 @@ This is a **separate project** from the private "Bunny Notes" app built for pers
 
 1. **Connect Stripe.** Payment gating is built in but needs your Stripe account wired up — see "Setting up checkout" below.
 2. **Host separately from the personal app.** Do not deploy this into the same repo/Pages site as the private Bunny Notes app.
+
+## Occasion greetings
+
+On a special day the note screen adds a headline banner above the note ("HOPPY BIRTHDAY JENNIFER!", "HAVE YOU SEEN MY PEEPS?") and moves themed notes to the front of the rotation. Banners cycle through their variants as the reader taps.
+
+- **Birthday and anniversary** are set in Settings. Month and day are required; **the year is optional** — supply it and the banner shows the age ("HOPPY 36th BIRTHDAY"), leave it blank and you still get the day. Dates set by the buyer travel in the share link (`&bd=`, `&an=`), so the recipient's app knows them; the recipient can also change them in their own Settings.
+- **Two holiday toggles**, both on by default. *Faith holidays*: Easter, Good Friday, Lent, Passover, Christmas Eve and Christmas. *Other holidays*: New Year's Eve and Day, Lunar New Year (with a special set for Years of the Rabbit), Valentine's, St. Patrick's, Mother's and Father's Day, Memorial Day, July 4th, Labor Day, Halloween, Thanksgiving.
+- **Priority:** a birthday or anniversary always outranks a holiday, and any specific holiday outranks Lent — otherwise the 40-day Lent season would hide St. Patrick's Day, which falls inside it every year.
+- Easter and its dependent days are computed (Gregorian computus), as are the floating US holidays. Lunar dates can't be derived arithmetically, so **Lunar New Year and Passover use verified tables in [app.js](app.js) that run through 2035** — after that those two are simply skipped, and the tables need extending. Everything else keeps working indefinitely.
+- Greeting text is part of the paid library in `worker/messages.js`, so it needs a `wrangler deploy` to change, and it never appears for non-buyers.
 
 ## Setting up checkout (Stripe Payment Link + verification Worker)
 

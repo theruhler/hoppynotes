@@ -25,7 +25,7 @@
 
       <section id="paywallScreen" class="card creator hidden">
         <h2>Send someone a little love</h2>
-        <p class="hint">Create a personalized note with 30 sweet messages and a shareable link they can open any day, on any device.</p>
+        <p class="hint">Create a personalized note with 225 sweet messages, birthday and holiday surprises, and a shareable link they can open any day, on any device.</p>
         <button id="unlockBtn" class="btn">Unlock for $1.99</button>
         <p id="paywallStatus" class="hint error hidden"></p>
         <p class="hint">One-time purchase. After checkout you'll come right back here, unlocked.</p>
@@ -64,6 +64,7 @@
           <img id="bunnyImage" src="bunny1.png" alt="Bunny" />
           <div id="bunnyTint" class="bunny-tint"></div>
         </div>
+        <p id="occasionBanner" class="occasion-banner hidden"></p>
         <p id="messageText">Tap for a new note.</p>
 
         <nav class="controls" aria-label="Controls">
@@ -109,6 +110,50 @@
         <label class="field checkbox" for="bunnyColorToggle">
           <input id="bunnyColorToggle" type="checkbox" />
           <span>Tint the bunny with this color</span>
+        </label>
+
+        <div class="field">
+          <span id="birthdayLabel">Their Birthday</span>
+          <div class="date-row" role="group" aria-labelledby="birthdayLabel">
+            <select id="birthdayMonth" aria-label="Birthday month"></select>
+            <select id="birthdayDay" aria-label="Birthday day"></select>
+            <input
+              id="birthdayYear"
+              type="number"
+              min="1900"
+              max="2200"
+              placeholder="Year"
+              aria-label="Birth year (optional)"
+            />
+          </div>
+        </div>
+
+        <div class="field">
+          <span id="anniversaryLabel">Your Anniversary</span>
+          <div class="date-row" role="group" aria-labelledby="anniversaryLabel">
+            <select id="anniversaryMonth" aria-label="Anniversary month"></select>
+            <select id="anniversaryDay" aria-label="Anniversary day"></select>
+            <input
+              id="anniversaryYear"
+              type="number"
+              min="1900"
+              max="2200"
+              placeholder="Year"
+              aria-label="Anniversary year (optional)"
+            />
+          </div>
+        </div>
+
+        <p class="hint settings-note">Year is optional — leave it blank and you'll still get the day.</p>
+
+        <label class="field checkbox" for="faithHolidayToggle">
+          <input id="faithHolidayToggle" type="checkbox" />
+          <span>Faith holidays (Easter, Lent, Good Friday, Passover, Christmas)</span>
+        </label>
+
+        <label class="field checkbox" for="funHolidayToggle">
+          <input id="funHolidayToggle" type="checkbox" />
+          <span>Other holidays (New Year, Lunar New Year, Valentine's, July 4th, Halloween, Thanksgiving and more)</span>
         </label>
 
         <div class="modal-actions">

@@ -1,4 +1,4 @@
-const CACHE_NAME = "hoppynotes-v3";
+const CACHE_NAME = "hoppynotes-v4";
 const ASSETS = [
   "./",
   "./index.html",
