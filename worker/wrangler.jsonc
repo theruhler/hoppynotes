@@ -1,4 +1,9 @@
 {
+  // IMPORTANT: this Worker belongs in a personal Cloudflare account, not a
+  // company one. Wrangler otherwise deploys to whichever account your
+  // browser/`wrangler login` session happens to hold. Before deploying:
+  //   source ./deploy-env.sh && npx wrangler whoami
+  // See "Deploying to the right Cloudflare account" in the README.
   "name": "hoppynotes-verify",
   "main": "worker.js",
   "compatibility_date": "2026-08-21",

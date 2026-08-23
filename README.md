@@ -26,6 +26,28 @@ On a special day the note screen adds a headline banner above the note ("HOPPY B
 - Easter and its dependent days are computed (Gregorian computus), as are the floating US holidays. Lunar dates can't be derived arithmetically, so **Lunar New Year and Passover use verified tables in [app.js](app.js) that run through 2035** — after that those two are simply skipped, and the tables need extending. Everything else keeps working indefinitely.
 - Greeting text is part of the paid library in `worker/messages.js`, so it needs a `wrangler deploy` to change, and it never appears for non-buyers.
 
+## Deploying to the right Cloudflare account
+
+This is a personal project and must **not** be deployed into a company Cloudflare account — it mixes billing, makes ownership of the asset ambiguous, and gives that company's admins control over a personal product.
+
+`npx wrangler login` uses whatever Cloudflare session your browser already holds, so if you are signed in for work, that is the account it offers. Authenticating with an API token instead avoids the browser completely and overrides any existing `wrangler login`:
+
+1. Create a free Cloudflare account using a **personal** email address (skip if you have one).
+2. Sign in to it and copy the **Account ID** from Workers & Pages.
+3. Create a token: My Profile → API Tokens → Create Token → **Edit Cloudflare Workers** template, scoped to that account.
+4. `cp worker/deploy-env.example.sh worker/deploy-env.sh`, paste both values in, then:
+   ```bash
+   cd worker && source ./deploy-env.sh && npx wrangler whoami
+   ```
+   `whoami` must show the personal account before you deploy. `deploy-env.sh` is gitignored — never commit the token.
+
+Notes:
+
+- `CLOUDFLARE_API_TOKEN` takes precedence over every profile and OAuth login, so this project stays pinned to the personal account no matter what the default login is.
+- Since `CLOUDFLARE_ACCOUNT_ID` names the account explicitly, Wrangler errors out rather than falling back to a different one.
+- If you upgrade Wrangler (4.86 is too old for this), newer versions add named profiles bound to a directory — `npx wrangler@latest auth create personal` — which achieves the same separation through OAuth instead of a token. Sign in through a private browser window so the work session is not reused.
+- The GitHub Pages side of the app is unaffected: it is served from the personal `theruhler/hoppynotes` repo and touches no Cloudflare account.
+
 ## Tester (admin) unlocks
 
 The owners can unlock the app on their own devices without paying, using private codes the Worker validates. There are no accounts or passwords — the code *is* the credential.
@@ -55,11 +77,15 @@ The "Create a note" screen is locked behind a one-time $1.99 unlock. Recipients 
 
 ### 1. Deploy the verification Worker
 
+First read **"Deploying to the right Cloudflare account"** below — `wrangler login` will silently target whatever account your browser is signed into.
+
 ```bash
 cd worker
-npx wrangler login          # first time only
+source ./deploy-env.sh      # sets the personal account + API token
+npx wrangler whoami         # confirm the account before deploying
 npx wrangler deploy
 npx wrangler secret put STRIPE_SECRET_KEY
+npx wrangler secret put ADMIN_CODES
 ```
 
 For the secret, use a [restricted API key](https://dashboard.stripe.com/apikeys) with only **Checkout Sessions: Read** permission — the Worker never needs more. `ALLOWED_ORIGIN` in [worker/wrangler.jsonc](worker/wrangler.jsonc) is already set to the live site's origin (`https://theruhler.github.io`).

@@ -1,2 +1,10 @@
 .DS_Store
+
+# The paid message library: lives only on the dev machine and in the Worker.
 worker/messages.js
+
+# Cloudflare credentials for deploying to the personal account.
+worker/deploy-env.sh
+.env
+.env.*
+*.env
