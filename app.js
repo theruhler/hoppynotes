@@ -281,6 +281,7 @@ const UNLOCK_STORAGE_KEY = "hoppynotes-unlocked-v1";
 const MESSAGES_CACHE_KEY = "hoppynotes-messages-v1";
 const OCCASIONS_CACHE_KEY = "hoppynotes-occasions-v1";
 const SHARE_TOKEN_KEY = "hoppynotes-share-token-v1";
+const ADMIN_CODE_KEY = "hoppynotes-admin-code-v1";
 
 const paywallScreen = document.getElementById("paywallScreen");
 const unlockBtn = document.getElementById("unlockBtn");
@@ -493,6 +494,66 @@ async function refreshMessagesWithSession(sessionId) {
     // Offline — teasers remain.
   }
   return false;
+}
+
+// Owner/tester unlock: the Worker checks the code against its ADMIN_CODES
+// secret, so nothing in the public app can be edited to fake it.
+async function applyAdminCode(code) {
+  if (!PAYWALL.verifyEndpoint || !code) {
+    return false;
+  }
+  try {
+    const resp = await fetch(`${PAYWALL.verifyEndpoint}?admin=${encodeURIComponent(code)}`);
+    const data = await resp.json();
+    if (data.unlocked === true) {
+      try {
+        localStorage.setItem(UNLOCK_STORAGE_KEY, `admin:${data.label || "tester"}`);
+        localStorage.setItem(ADMIN_CODE_KEY, code);
+        if (typeof data.shareToken === "string" && data.shareToken) {
+          localStorage.setItem(SHARE_TOKEN_KEY, data.shareToken);
+        }
+      } catch {
+        // Storage unavailable — the unlock still applies to this page load.
+      }
+      absorbContent(data);
+      return true;
+    }
+  } catch {
+    // Offline or rejected — the paywall stays up.
+  }
+  return false;
+}
+
+// Reads ?admin=CODE, then strips it so the code isn't left in the address
+// bar, history, or a screenshot.
+async function consumeAdminCode() {
+  const params = new URLSearchParams(window.location.search);
+  const code = params.get("admin");
+  if (!code) {
+    return false;
+  }
+  const url = new URL(window.location.href);
+  url.searchParams.delete("admin");
+  history.replaceState(null, "", url.pathname + url.search + url.hash);
+  if (!PAYWALL.verifyEndpoint) {
+    showPaywallScreen();
+    setPaywallStatus("Tester unlock isn't set up yet. Deploy the Worker and add its URL in app.js.", true);
+    return false;
+  }
+  const ok = await applyAdminCode(code);
+  if (!ok) {
+    showPaywallScreen();
+    setPaywallStatus("That tester code wasn't recognized. Check the code, or deploy the Worker's ADMIN_CODES secret.", true);
+  }
+  return ok;
+}
+
+function storedAdminCode() {
+  try {
+    return localStorage.getItem(ADMIN_CODE_KEY) || "";
+  } catch {
+    return "";
+  }
 }
 
 function readUrlPersonalization() {
@@ -923,7 +984,7 @@ populateDateSelects(birthdayMonth, birthdayDay);
 populateDateSelects(anniversaryMonth, anniversaryDay);
 
 (async () => {
-  const justUnlocked = await consumeCheckoutSession();
+  const justUnlocked = (await consumeCheckoutSession()) || (await consumeAdminCode());
   const fromUrl = readUrlPersonalization();
   const stored = loadStoredPersonalization();
 
@@ -950,9 +1011,14 @@ populateDateSelects(anniversaryMonth, anniversaryDay);
     }
     if (!hydrateMessagesFromCache() && isUnlocked()) {
       try {
-        await refreshMessagesWithSession(localStorage.getItem(UNLOCK_STORAGE_KEY));
+        const adminCode = storedAdminCode();
+        if (adminCode) {
+          await applyAdminCode(adminCode);
+        } else {
+          await refreshMessagesWithSession(localStorage.getItem(UNLOCK_STORAGE_KEY));
+        }
       } catch {
-        // Teasers remain until the buyer is back online.
+        // Teasers remain until the tester or buyer is back online.
       }
     }
     refreshOccasion();

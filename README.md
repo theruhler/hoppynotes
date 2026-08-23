@@ -26,6 +26,29 @@ On a special day the note screen adds a headline banner above the note ("HOPPY B
 - Easter and its dependent days are computed (Gregorian computus), as are the floating US holidays. Lunar dates can't be derived arithmetically, so **Lunar New Year and Passover use verified tables in [app.js](app.js) that run through 2035** — after that those two are simply skipped, and the tables need extending. Everything else keeps working indefinitely.
 - Greeting text is part of the paid library in `worker/messages.js`, so it needs a `wrangler deploy` to change, and it never appears for non-buyers.
 
+## Tester (admin) unlocks
+
+The owners can unlock the app on their own devices without paying, using private codes the Worker validates. There are no accounts or passwords — the code *is* the credential.
+
+1. Generate a code per person (never reuse one between people):
+   ```bash
+   node -e 'console.log("hn_" + require("crypto").randomBytes(18).toString("base64url"))'
+   ```
+2. Store them all in one secret as `label:code` pairs:
+   ```bash
+   cd worker && npx wrangler secret put ADMIN_CODES
+   # paste e.g.  mike:hn_xxxx,partner:hn_yyyy
+   ```
+3. Each person opens `https://theruhler.github.io/hoppynotes/?admin=<their code>` once on each device. The app verifies the code with the Worker, unlocks, and remembers it; the code is stripped from the address bar immediately.
+
+Notes:
+
+- Codes are checked server-side against the secret, so nothing in the public app can be edited to fake an unlock, and a code never appears in generated share links.
+- **To revoke one person**, run `wrangler secret put ADMIN_CODES` again with that label removed. The others keep working.
+- Unlock is per device: opening the link on the phone and the laptop is expected.
+- Each use is logged (`wrangler tail` shows `admin_unlock` with the label), so you can see which code was used.
+- **Testing the real purchase flow is separate.** Admin codes skip checkout entirely; to rehearse paying, use Stripe test mode (a test-mode Payment Link, the Worker's `STRIPE_SECRET_KEY` set to your test key, and card `4242 4242 4242 4242`).
+
 ## Setting up checkout (Stripe Payment Link + verification Worker)
 
 The "Create a note" screen is locked behind a one-time $1.99 unlock. Recipients opening a shared `?to=...&from=...` link always see their note for free — only creating is gated. Unlocks are verified server-side: a tiny Cloudflare Worker ([worker/worker.js](worker/worker.js)) checks with Stripe that the checkout session was actually paid before the app unlocks.

@@ -11,6 +11,7 @@
     // The site's origin (scheme + host only, no path).
     "ALLOWED_ORIGIN": "https://theruhler.github.io"
   }
-  // The Stripe secret key is NOT set here. After deploying, run:
+  // Secrets are NOT set here. After deploying, run:
   //   wrangler secret put STRIPE_SECRET_KEY
+  //   wrangler secret put ADMIN_CODES   // "label:code,label:code" for testers
 }

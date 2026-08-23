@@ -2,6 +2,7 @@
 //
 // GET /?session_id=cs_...  ->  { unlocked, shareToken, messages }   (buyer)
 // GET /?share=<token>      ->  { messages }                          (recipient)
+// GET /?admin=<code>       ->  { unlocked, label, shareToken, ... }  (tester)
 //
 // The full message library lives in messages.js and is only served here:
 // buyers receive it after Stripe confirms their Checkout Session was paid,
@@ -9,7 +10,13 @@
 // The token encrypts the buyer's session id, so recipients can load the
 // notes without ever learning the credential that unlocks creator access.
 //
-// Deploy with `wrangler deploy`, then: `wrangler secret put STRIPE_SECRET_KEY`.
+// Admin codes let the owners test on their own devices without paying. They
+// live in the ADMIN_CODES secret as "label:code,label:code" and are checked
+// here, never in the public app. Remove a label and redeploy to revoke it.
+//
+// Deploy with `wrangler deploy`, then:
+//   wrangler secret put STRIPE_SECRET_KEY
+//   wrangler secret put ADMIN_CODES
 
 import { MESSAGES, OCCASIONS } from "./messages.js";
 
@@ -46,13 +53,52 @@ function fromBase64Url(str) {
   return out;
 }
 
-async function mintShareToken(env, sessionId) {
+async function sha256(text) {
+  return new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text)));
+}
+
+// Compares digests rather than raw strings so the check is constant time and
+// leaks neither the code's contents nor its length.
+async function secretEquals(a, b) {
+  const [left, right] = await Promise.all([sha256(a), sha256(b)]);
+  let diff = 0;
+  for (let i = 0; i < left.length; i++) {
+    diff |= left[i] ^ right[i];
+  }
+  return diff === 0;
+}
+
+function parseAdminCodes(env) {
+  return String(env.ADMIN_CODES || "")
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+    .map((entry) => {
+      const split = entry.indexOf(":");
+      return split === -1
+        ? { label: "tester", code: entry }
+        : { label: entry.slice(0, split), code: entry.slice(split + 1) };
+    })
+    .filter((entry) => entry.code);
+}
+
+async function matchAdminCode(env, candidate) {
+  let matched = null;
+  for (const entry of parseAdminCodes(env)) {
+    if (await secretEquals(entry.code, candidate)) {
+      matched = entry;
+    }
+  }
+  return matched;
+}
+
+async function mintShareToken(env, subject) {
   const key = await getTokenKey(env);
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const ciphertext = await crypto.subtle.encrypt(
     { name: "AES-GCM", iv },
     key,
-    new TextEncoder().encode(sessionId)
+    new TextEncoder().encode(subject)
   );
   const packed = new Uint8Array(iv.length + ciphertext.byteLength);
   packed.set(iv);
@@ -95,11 +141,34 @@ export default {
     // Recipient path: an opaque share token grants the message library only.
     const shareToken = params.get("share");
     if (shareToken) {
-      const sessionId = await readShareToken(env, shareToken);
-      if (!sessionId || !sessionId.startsWith("cs_")) {
+      const subject = await readShareToken(env, shareToken);
+      if (!subject || !(subject.startsWith("cs_") || subject.startsWith("admin:"))) {
         return jsonResponse({ error: "invalid_share_token" }, 403, corsHeaders);
       }
       return jsonResponse({ messages: MESSAGES, occasions: OCCASIONS }, 200, corsHeaders);
+    }
+
+    // Owner/tester path: a private code unlocks the app without a purchase.
+    const adminCode = params.get("admin");
+    if (adminCode) {
+      const entry = await matchAdminCode(env, adminCode);
+      if (!entry) {
+        console.error(JSON.stringify({ message: "admin_code_rejected" }));
+        return jsonResponse({ unlocked: false, error: "invalid_admin_code" }, 403, corsHeaders);
+      }
+      console.log(JSON.stringify({ message: "admin_unlock", label: entry.label }));
+      return jsonResponse(
+        {
+          unlocked: true,
+          admin: true,
+          label: entry.label,
+          shareToken: await mintShareToken(env, `admin:${entry.label}`),
+          messages: MESSAGES,
+          occasions: OCCASIONS
+        },
+        200,
+        corsHeaders
+      );
     }
 
     // Buyer path: verify the checkout session with Stripe.
