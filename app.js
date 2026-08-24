@@ -270,9 +270,8 @@ const PAYWALL = {
   // Stripe Payment Link URL from the Stripe Dashboard (see README).
   // Its after-payment redirect must be: https://theruhler.github.io/hoppynotes/?session_id={CHECKOUT_SESSION_ID}
   paymentLinkUrl: "",
-  // URL of the deployed verification Worker (see worker/ and README),
-  // e.g. "https://hoppynotes-verify.YOUR-SUBDOMAIN.workers.dev"
-  verifyEndpoint: ""
+  // Deployed verification Worker (MadMooze Mfg Cloudflare account).
+  verifyEndpoint: "https://hoppynotes-verify.madmoozemfg.workers.dev"
 };
 
 const SETTINGS_KEY = "hoppynotes-settings-v1";
