@@ -5,7 +5,7 @@ This is a **separate project** from the private "Bunny Notes" app built for pers
 ## What's different from the personal edition
 
 - No PIN lock (a public product should not force a PIN on the recipient).
-- No hardcoded names or Disney-referencing quotes — all 30 messages are original.
+- No hardcoded names or Disney-referencing quotes — all 225 messages are original.
 - Adds a "Create a note" screen: the buyer enters a recipient name and their own name, gets a shareable link, and can preview it before sending.
 - Adds occasion greetings: birthdays, anniversaries, and holidays (see below).
 - Brand name: **HoppyNotes**.
@@ -77,16 +77,23 @@ The "Create a note" screen is locked behind a one-time $1.99 unlock. Recipients 
 
 ### 1. Deploy the verification Worker
 
-First read **"Deploying to the right Cloudflare account"** below — `wrangler login` will silently target whatever account your browser is signed into.
+First read **"Deploying to the right Cloudflare account"** above — `wrangler login` silently targets whatever account your browser is signed into.
 
 ```bash
 cd worker
 source ./deploy-env.sh      # sets the personal account + API token
 npx wrangler whoami         # confirm the account before deploying
 npx wrangler deploy
-npx wrangler secret put STRIPE_SECRET_KEY
-npx wrangler secret put ADMIN_CODES
+./set-secrets.sh            # sets ADMIN_CODES + SHARE_TOKEN_SECRET
 ```
+
+Secrets, and what needs which:
+
+| Secret | Required for | Notes |
+| --- | --- | --- |
+| `SHARE_TOKEN_SECRET` | everything | Keys the AES-GCM share tokens. The Worker refuses all requests (500) without it, rather than deriving a guessable key. Rotating it invalidates existing note links. |
+| `ADMIN_CODES` | tester unlocks | `label:code,label:code` — see "Tester (admin) unlocks". |
+| `STRIPE_SECRET_KEY` | selling only | Only the buyer path needs it. Tester unlocks and note links work fine before Stripe exists. |
 
 For the secret, use a [restricted API key](https://dashboard.stripe.com/apikeys) with only **Checkout Sessions: Read** permission — the Worker never needs more. `ALLOWED_ORIGIN` in [worker/wrangler.jsonc](worker/wrangler.jsonc) is already set to the live site's origin (`https://theruhler.github.io`).
 

@@ -14,26 +14,22 @@
 // live in the ADMIN_CODES secret as "label:code,label:code" and are checked
 // here, never in the public app. Remove a label and redeploy to revoke it.
 //
-// Deploy with `wrangler deploy`, then:
-//   wrangler secret put STRIPE_SECRET_KEY
-//   wrangler secret put ADMIN_CODES
+// Deploy with `wrangler deploy`, then set the secrets:
+//   wrangler secret put SHARE_TOKEN_SECRET  // required; keys the share tokens
+//   wrangler secret put ADMIN_CODES         // required for tester unlocks
+//   wrangler secret put STRIPE_SECRET_KEY   // required only to sell
 
 import { MESSAGES, OCCASIONS } from "./messages.js";
 
-let cachedTokenKey = null;
-
+// Derived per request on purpose: caching the key in a module-level variable
+// would keep serving the old one after a secret rotation until the isolate
+// recycled. The derivation costs microseconds.
 async function getTokenKey(env) {
-  if (!cachedTokenKey) {
-    const digest = await crypto.subtle.digest(
-      "SHA-256",
-      new TextEncoder().encode(`${env.STRIPE_SECRET_KEY}:hoppynotes-share-v1`)
-    );
-    cachedTokenKey = await crypto.subtle.importKey("raw", digest, "AES-GCM", false, [
-      "encrypt",
-      "decrypt"
-    ]);
-  }
-  return cachedTokenKey;
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(`${env.SHARE_TOKEN_SECRET}:hoppynotes-share-v1`)
+  );
+  return crypto.subtle.importKey("raw", digest, "AES-GCM", false, ["encrypt", "decrypt"]);
 }
 
 function toBase64Url(bytes) {
@@ -136,6 +132,13 @@ export default {
       return jsonResponse({ unlocked: false, error: "method_not_allowed" }, 405, corsHeaders);
     }
 
+    // Share tokens are only unforgeable if this secret is really set; deriving
+    // a key from an undefined value would be guessable from the public source.
+    if (!env.SHARE_TOKEN_SECRET) {
+      console.error(JSON.stringify({ message: "missing_share_token_secret" }));
+      return jsonResponse({ error: "worker_misconfigured" }, 500, corsHeaders);
+    }
+
     const params = new URL(request.url).searchParams;
 
     // Recipient path: an opaque share token grants the message library only.
@@ -175,6 +178,11 @@ export default {
     const sessionId = params.get("session_id") || "";
     if (!/^cs_[A-Za-z0-9_]{10,}$/.test(sessionId)) {
       return jsonResponse({ unlocked: false, error: "invalid_session_id" }, 400, corsHeaders);
+    }
+
+    if (!env.STRIPE_SECRET_KEY) {
+      console.error(JSON.stringify({ message: "missing_stripe_secret_key" }));
+      return jsonResponse({ unlocked: false, error: "stripe_not_configured" }, 500, corsHeaders);
     }
 
     let session;

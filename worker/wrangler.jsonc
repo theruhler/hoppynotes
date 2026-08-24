@@ -16,7 +16,8 @@
     // The site's origin (scheme + host only, no path).
     "ALLOWED_ORIGIN": "https://theruhler.github.io"
   }
-  // Secrets are NOT set here. After deploying, run:
-  //   wrangler secret put STRIPE_SECRET_KEY
-  //   wrangler secret put ADMIN_CODES   // "label:code,label:code" for testers
+  // Secrets are NOT set here. After deploying, run ./set-secrets.sh, or:
+  //   wrangler secret put SHARE_TOKEN_SECRET  // required by every request
+  //   wrangler secret put ADMIN_CODES         // "label:code,..." for testers
+  //   wrangler secret put STRIPE_SECRET_KEY   // only needed to sell
 }

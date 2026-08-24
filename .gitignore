@@ -8,3 +8,5 @@ worker/deploy-env.sh
 .env
 .env.*
 *.env
+
+worker/set-secrets.sh
